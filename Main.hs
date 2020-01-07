@@ -56,13 +56,13 @@ parsePage p =
     tagTable = TagOpen "table" [("id", "comid0")] :: Tag ByteString
     tagTd = TagOpen "td" [("background", "/images/dot3.gif")] :: Tag ByteString
 
-getBooks :: MonadResource m => Source m BookInfo
+getBooks :: (MonadThrow m, MonadResource m) => ConduitT () BookInfo m ()
 getBooks = do
     manager <- liftIO $ newManager tlsManagerSettings
     let fetch n = do
             liftIO $ threadDelay 500000
             req <- parseUrlThrow (url n)
-            http req manager >>= ($$+- sinkBody) . responseBody
+            http req manager >>= ($$+- sinkBody) . sealConduitT . responseBody
         sinkBody = CL.fold B.append B.empty
         fetchInfo n = do
             p <- fetch n
@@ -70,10 +70,10 @@ getBooks = do
             if null info
                 then throwM EmptyInfoException
                 else return info
-    CL.sourceList [1..] =$= CL.concatMapM fetchInfo
+    CL.sourceList [1..] .| CL.concatMapM fetchInfo
 
 printBooks :: Day -> IO ()
-printBooks day = runResourceT $ getBooks $$ printCurDay
+printBooks day = runResourceT $ runConduit $ getBooks .| printCurDay
   where
     printCurDay = do
         next <- await
