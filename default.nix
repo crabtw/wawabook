@@ -1,13 +1,17 @@
-{ nixpkgs ? import <nixpkgs> {}, compiler ? "default" }:
+{ mkDerivation, base, bytestring, conduit, http-conduit, resourcet
+, stdenv, tagsoup, time, transformers
+}:
 
-let
-
-  inherit (nixpkgs) pkgs;
-
-  haskellPackages = if compiler == "default"
-                      then pkgs.haskellPackages
-                      else pkgs.haskell.packages.${compiler};
-
-in
-
-  haskellPackages.callPackage ./wawabook.nix {}
+mkDerivation {
+  pname = "wawabook";
+  version = "0.1.0.0";
+  src = ./.;
+  isLibrary = false;
+  isExecutable = true;
+  executableHaskellDepends = [
+    base bytestring conduit http-conduit resourcet tagsoup time
+    transformers
+  ];
+  description = "A HTML scraper for wawabook.com.tw";
+  license = stdenv.lib.licenses.asl20;
+}
