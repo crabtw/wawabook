@@ -10,4 +10,8 @@ let
 
 in
 
-  (haskellPackages.callPackage ./default.nix {}).env
+  with haskellPackages;
+  shellFor {
+    packages = p: [ (callPackage ./. {}) ];
+    buildInputs = [ cabal-install ];
+  }

@@ -5,6 +5,7 @@ module Main where
 import Control.Exception
 import Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as B
+import Data.List (intercalate)
 import Data.Maybe
 import Data.Time
 import Data.Typeable
@@ -35,11 +36,13 @@ today = do
     zone <- getCurrentTimeZone
     return $ localDay $ utcToLocalTime zone time
 
-strToDay :: String -> Maybe Day
-strToDay = parseTimeM True defaultTimeLocale "%Y/%m/%d"
+strToDay :: String -> String -> Maybe Day
+strToDay sep = parseTimeM True defaultTimeLocale fmt
+  where
+    fmt = intercalate sep ["%Y", "%m", "%d"]
 
 parseArgs :: [String] -> Maybe Day
-parseArgs (a:as) = strToDay a
+parseArgs (a:as) = strToDay "-" a
 parseArgs [] = Nothing
 
 url :: Int -> String
@@ -49,9 +52,11 @@ parsePage :: ByteString -> [BookInfo]
 parsePage p =
     let tbl = dropWhile (~/= tagTable) $ parseTags p
         rows = init $ partitions (~== tagTd) tbl
-        fields = map (tail . map ((!! 1)) . sections (== TagOpen "td" [])) rows
-        s2d = fromJust . strToDay . B.unpack . B.takeWhile (/= '(') . fromTagText
-    in map (\[d, _, _, n, _, _] -> BookInfo (s2d d) (fromTagText n)) fields
+        textTags = filter isTagText . takeWhile (/= TagClose "td") . drop 1
+        mergeTextTags = B.concat . map fromTagText
+        fields = map (map (mergeTextTags . textTags) . sections (== TagOpen "td" [])) rows
+        s2d = fromJust . strToDay "/" . B.unpack . B.takeWhile (/= '(')
+    in map (\[_, d, _, _, n, _, _] -> BookInfo (s2d d) n) fields
   where
     tagTable = TagOpen "table" [("id", "comid0")] :: Tag ByteString
     tagTd = TagOpen "td" [("background", "/images/dot3.gif")] :: Tag ByteString
